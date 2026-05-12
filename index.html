@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Kelompok 2 - Final</title>
+    <title>Dashboard Kelompok 2</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
@@ -13,7 +13,6 @@
         .data-value { font-size: 2.5rem; font-weight: bold; margin-top: 5px; }
         .section-title { font-weight: 700; color: #2d3748; border-left: 5px solid #38a169; padding-left: 10px; margin: 25px 0 15px 0; text-transform: uppercase; font-size: 1.1rem;}
         .panel { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); }
-        #esp-ip { font-family: monospace; letter-spacing: 1px; }
     </style>
 </head>
 <body>
@@ -27,11 +26,11 @@
         <div class="panel mb-4">
             <div class="row align-items-center">
                 <div class="col-md-4">
-                    <label class="small fw-bold text-muted">ALAMAT IP ESP32:</label>
-                    <input type="text" id="esp-ip" class="form-control fw-bold text-primary" placeholder="Mendeteksi IP...">
+                    <label class="small fw-bold">IP ESP32 (Auto-Detected):</label>
+                    <input type="text" id="esp-ip" class="form-control fw-bold text-primary" placeholder="Mencari IP...">
                 </div>
                 <div class="col-md-8 d-flex justify-content-end gap-2 mt-3 mt-md-0">
-                    <button class="btn btn-warning fw-bold text-dark" onclick="sendCmd('/servo')">⚙️ PUTAR RAK</button>
+                    <button class="btn btn-warning fw-bold text-dark" onclick="sendCmd('/servo')">⚙️ PUTAR RAK MANUAL</button>
                     <button id="btn-logging" class="btn btn-secondary fw-bold" onclick="toggleLogging()">⌛ CEK STATUS...</button>
                     <button class="btn btn-success fw-bold" onclick="window.open('https://docs.google.com/spreadsheets/d/1UjvYADIU_KLuU5A5py79MUlr33sPx85IPz9HD1Pppys/edit')">📊 G-SHEETS</button>
                 </div>
@@ -39,73 +38,78 @@
         </div>
 
         <h5 class="section-title">MONITORING REALTIME (LIVE)</h5>
-        <div class="row g-3 text-uppercase">
-            <div class="col-md-3"><div class="card-custom bg-danger"><h6>Suhu</h6><div class="data-value"><span id="v-suhu">--</span>°C</div></div></div>
-            <div class="col-md-3"><div class="card-custom bg-primary"><h6>Kelembapan</h6><div class="data-value"><span id="v-hum">--</span>%</div></div></div>
-            <div class="col-md-3"><div class="card-custom bg-warning text-dark"><h6>Heater</h6><div class="data-value" id="v-heater">--</div></div></div>
-            <div class="col-md-3"><div class="card-custom bg-dark"><h6>Fan</h6><div class="data-value" id="v-fan">--</div></div></div>
+        <div class="row g-3">
+            <div class="col-md-3"><div class="card-custom bg-danger"><h6>SUHU</h6><div class="data-value"><span id="v-suhu">--</span>°C</div></div></div>
+            <div class="col-md-3"><div class="card-custom bg-primary"><h6>KELEMBAPAN</h6><div class="data-value"><span id="v-hum">--</span>%</div></div></div>
+            <div class="col-md-3"><div class="card-custom bg-warning text-dark"><h6>HEATER</h6><div class="data-value" id="v-heater">--</div></div></div>
+            <div class="col-md-3"><div class="card-custom bg-dark"><h6>COOLING FAN</h6><div class="data-value" id="v-fan">--</div></div></div>
         </div>
 
-        <h5 class="section-title">GRAFIK PERKEMBANGAN</h5>
-        <div class="panel"><canvas id="liveChart" style="width: 100%; height: 350px;"></canvas></div>
+        <h5 class="section-title">GRAFIK PENGUKURAN (TIAP 10 MENIT)</h5>
+        <div class="panel">
+            <canvas id="liveChart" style="width: 100%; height: 350px;"></canvas>
+        </div>
 
         <div class="row mt-4">
             <div class="col-md-6">
-                <h5 class="section-title">SD CARD (LOCAL)</h5>
+                <h5 class="section-title">MANAJEMEN SD CARD</h5>
                 <div class="panel d-flex gap-2">
                     <button class="btn btn-outline-info fw-bold w-100" onclick="sendCmd('/status')">ℹ️ STATUS</button>
                     <button class="btn btn-outline-primary fw-bold w-100" onclick="downloadSD()">💾 DOWNLOAD</button>
+                    <button class="btn btn-outline-danger fw-bold w-100" onclick="confirmReset()">🗑️ RESET</button>
                 </div>
             </div>
             <div class="col-md-6">
-                <h5 class="section-title">HISTORI TERAKHIR</h5>
-                <div class="panel">
-                    <p class="small text-muted mb-0">Sinkronisasi otomatis dengan Google Sheets setiap 15 detik.</p>
+                <h5 class="section-title">FILTER DATA HISTORI</h5>
+                <div class="panel d-flex gap-2">
+                    <input type="date" id="filter-date" class="form-control">
+                    <button class="btn btn-dark fw-bold px-4" onclick="filterHistory()">CARI</button>
                 </div>
             </div>
         </div>
 
-        <div class="panel mt-4 mb-5 table-responsive">
+        <h5 class="section-title">HISTORI DATA (GOOGLE SHEETS)</h5>
+        <div class="panel mb-5 table-responsive">
             <table class="table table-hover text-center">
-                <thead class="table-dark text-uppercase small">
-                    <tr><th>Waktu</th><th>Suhu</th><th>Hum</th><th>Heater</th><th>Fan</th></tr>
+                <thead class="table-dark">
+                    <tr><th>Timestamp</th><th>Suhu (°C)</th><th>Kelembapan (%)</th><th>Heater</th><th>Fan</th></tr>
                 </thead>
-                <tbody id="t-body" class="small">
-                    <tr><td colspan="5">Menghubungkan ke Cloud...</td></tr>
+                <tbody id="t-body">
+                    <tr><td colspan="5">Memuat histori data...</td></tr>
                 </tbody>
             </table>
         </div>
     </div>
 
     <script>
-        // Masukkan URL Deployment Google Apps Script Anda di sini
         const GAS_URL = "https://script.google.com/macros/s/AKfycbyxtu0ce0M3Hu0Az11P-SGnNRKd8PfJyQ1NoScQlp7Oz1OG0kNgwbiH6gR6q_yzKF7KrQ/exec"; 
         let liveChart;
 
-        function formatIP(rawIP) {
-            let clean = String(rawIP).replace(/\s/g, '');
-            // Jika IP rusak (tidak ada titik), pasang titiknya (192168236177 -> 192.168.236.177)
-            if (!clean.includes(".") && clean.length >= 10) {
-                return clean.substring(0,3) + "." + clean.substring(3,6) + "." + clean.substring(6,9) + "." + clean.substring(9);
-            }
-            return clean;
-        }
-
+        // FUNGSI KONTROL ESP32
         function sendCmd(path) {
             const ip = document.getElementById('esp-ip').value;
-            if(!ip || ip.includes("Mendeteksi")) return alert("IP belum siap!");
+            if(!ip || ip.includes("Mencari")) return alert("IP belum siap!");
             fetch(`http://${ip}${path}`, { method: 'POST' })
                 .then(r => r.text())
-                .then(t => alert("Berhasil: " + t))
-                .catch(e => alert("Gagal konek ke ESP32. Cek WiFi laptop Anda!"));
+                .then(t => alert("Respons: " + t))
+                .catch(e => alert("Gagal koneksi. Pastikan ESP32 & Laptop di WiFi yang sama!"));
         }
 
         function downloadSD() {
             const ip = document.getElementById('esp-ip').value;
-            if(!ip) return;
-            window.open(`http://${ip}/download`, '_blank');
+            if(ip) window.open(`http://${ip}/download`, '_blank');
         }
 
+        function confirmReset() { if(confirm("Hapus data di SD Card?")) sendCmd('/hapusdata'); }
+
+        function toggleLogging() {
+            const btn = document.getElementById('btn-logging');
+            let newState = btn.innerText.includes("START") ? "ON" : "OFF";
+            btn.innerText = "Memproses...";
+            fetch(`${GAS_URL}?action=toggle&value=${newState}`).then(() => fetchHistoryAndGraph());
+        }
+
+        // INIT GRAFIK
         function initChart() {
             const ctx = document.getElementById('liveChart').getContext('2d');
             liveChart = new Chart(ctx, {
@@ -113,18 +117,19 @@
                 data: {
                     labels: [],
                     datasets: [
-                        { label: 'Suhu (°C)', borderColor: '#e53e3e', data: [], tension: 0.3 },
-                        { label: 'Kelembapan (%)', borderColor: '#3182ce', data: [], tension: 0.3 }
+                        { label: 'Suhu (°C)', borderColor: '#e53e3e', backgroundColor: 'rgba(229, 62, 62, 0.1)', data: [], tension: 0.3, fill: true },
+                        { label: 'Kelembapan (%)', borderColor: '#3182ce', backgroundColor: 'rgba(49, 130, 206, 0.1)', data: [], tension: 0.3, fill: true }
                     ]
                 },
                 options: { responsive: true, maintainAspectRatio: false }
             });
         }
 
-        // Ambil data langsung dari IP ESP32
+        // AMBIL DATA LIVE DARI ESP32 (YANG MENGISI KOTAK WARNA-WARNI)
         function fetchRealtime() {
             const ip = document.getElementById('esp-ip').value;
-            if(!ip || ip.includes("Mendeteksi")) return;
+            // Hanya jalan kalau IP sudah berbentuk angka dari G-Sheets
+            if(!ip || ip.includes("Mencari")) return;
             
             fetch(`http://${ip}/data`)
                 .then(r => r.json())
@@ -134,22 +139,18 @@
                     document.getElementById('v-heater').innerText = d.heater;
                     document.getElementById('v-fan').innerText = d.fan;
                 })
-                .catch(e => console.log("ESP32 Offline..."));
+                .catch(e => console.log("Menunggu koneksi langsung ke ESP32..."));
         }
 
-        // Ambil data dari Google Sheets
-        function fetchCloudData() {
+        // AMBIL DATA HISTORI & IP DARI GOOGLE SHEETS
+        function fetchHistoryAndGraph() {
             fetch(`${GAS_URL}?read=true`)
                 .then(r => r.json())
                 .then(res => {
-                    // Perbaiki & Update IP
-                    if(res.ip) {
-                        const ipInput = document.getElementById('esp-ip');
-                        const fixedIP = formatIP(res.ip);
-                        if(ipInput.value !== fixedIP) ipInput.value = fixedIP;
-                    }
+                    // Update IP
+                    if(res.ip) document.getElementById('esp-ip').value = res.ip;
 
-                    // Update Status Tombol Logging
+                    // Update Tombol Status
                     const btn = document.getElementById('btn-logging');
                     if(res.logging === "ON") {
                         btn.innerText = "⏹️ STOP LOGGING"; btn.className = "btn btn-danger fw-bold";
@@ -157,38 +158,40 @@
                         btn.innerText = "▶️ START LOGGING"; btn.className = "btn btn-success fw-bold";
                     }
 
-                    // Update Tabel Histori
-                    let html = "";
-                    const dataShow = [...res.logs].reverse().slice(0, 8);
-                    dataShow.forEach(row => {
-                        html += `<tr><td>${row.waktu}</td><td>${row.suhu}</td><td>${row.kelembapan}</td>
-                                 <td><span class="badge ${row.heater=='ON'?'bg-warning text-dark':'bg-secondary'}">${row.heater}</span></td>
-                                 <td><span class="badge ${row.fan=='ON'?'bg-dark':'bg-secondary'}">${row.fan}</span></td></tr>`;
-                    });
-                    document.getElementById('t-body').innerHTML = html;
+                    // Pastikan data histori ada sebelum update tabel
+                    if(res.logs && res.logs.length > 0) {
+                        let html = "";
+                        const dataReversed = [...res.logs].reverse().slice(0, 10);
+                        dataReversed.forEach(row => {
+                            html += `<tr><td>${row.waktu}</td><td>${row.suhu}</td><td>${row.kelembapan}</td>
+                                     <td><span class="badge ${row.heater=='ON'?'bg-warning text-dark':'bg-secondary'}">${row.heater}</span></td>
+                                     <td><span class="badge ${row.fan=='ON'?'bg-dark':'bg-secondary'}">${row.fan}</span></td></tr>`;
+                        });
+                        document.getElementById('t-body').innerHTML = html;
 
-                    // Update Grafik
-                    const cData = res.logs.slice(-15);
-                    liveChart.data.labels = cData.map(d => d.waktu.split(' ')[1] || d.waktu);
-                    liveChart.data.datasets[0].data = cData.map(d => d.suhu);
-                    liveChart.data.datasets[1].data = cData.map(d => d.kelembapan);
-                    liveChart.update();
+                        // Update Grafik
+                        const chartData = res.logs.slice(-20);
+                        liveChart.data.labels = chartData.map(d => d.waktu.split(' ')[1] || d.waktu);
+                        liveChart.data.datasets[0].data = chartData.map(d => d.suhu);
+                        liveChart.data.datasets[1].data = chartData.map(d => d.kelembapan);
+                        liveChart.update();
+                    }
                 })
-                .catch(e => console.error("Cloud Error"));
+                .catch(e => console.error("Proses sinkronisasi Google Sheets tertunda..."));
         }
 
-        function toggleLogging() {
-            const btn = document.getElementById('btn-logging');
-            let next = btn.innerText.includes("START") ? "ON" : "OFF";
-            btn.innerText = "Memproses...";
-            fetch(`${GAS_URL}?action=toggle&value=${next}`).then(() => fetchCloudData());
+        // FUNGSI FILTER TANGGAL (Kosongan agar tombol tidak error, logika bisa dikembangkan nanti)
+        function filterHistory() {
+            alert("Fitur filter tanggal memuat ulang data G-Sheets...");
+            fetchHistoryAndGraph(); 
         }
 
+        // JALANKAN SAAT HALAMAN DIBUKA
         window.onload = () => {
             initChart();
-            fetchCloudData();
-            setInterval(fetchRealtime, 2000); // Live data tiap 2 detik
-            setInterval(fetchCloudData, 15000); // Cloud data tiap 15 detik
+            fetchHistoryAndGraph(); // Ambil IP dan Histori dari G-Sheets
+            setInterval(fetchRealtime, 2000); // Ambil Suhu Live tiap 2 detik
+            setInterval(fetchHistoryAndGraph, 15000); // Sinkron G-Sheets tiap 15 detik
         };
     </script>
 </body>
