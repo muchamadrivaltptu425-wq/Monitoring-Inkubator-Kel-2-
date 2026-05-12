@@ -26,18 +26,19 @@
         <div class="panel mb-4">
             <div class="row align-items-center">
                 <div class="col-md-4">
-                    <label class="small fw-bold">IP ESP32 (Auto-Detected):</label>
-                    <input type="text" id="esp-ip" class="form-control fw-bold text-primary" placeholder="Mencari IP...">
+                    <label class="small fw-bold">IP ESP32 (Cloud Mode):</label>
+                    <input type="text" id="esp-ip" class="form-control fw-bold text-primary" readonly>
                 </div>
                 <div class="col-md-8 d-flex justify-content-end gap-2 mt-3 mt-md-0">
-                    <button class="btn btn-warning fw-bold text-dark" onclick="sendCmd('/servo')">⚙️ PUTAR RAK MANUAL</button>
+                    <button class="btn btn-warning fw-bold text-dark" onclick="sendCmd('/servo')">⚙️ PUTAR RAK</button>
                     <button id="btn-logging" class="btn btn-secondary fw-bold" onclick="toggleLogging()">⌛ CEK STATUS...</button>
                     <button class="btn btn-success fw-bold" onclick="window.open('https://docs.google.com/spreadsheets/d/1UjvYADIU_KLuU5A5py79MUlr33sPx85IPz9HD1Pppys/edit')">📊 G-SHEETS</button>
                 </div>
             </div>
+            <small class="text-muted mt-2 d-block">*Tombol kontrol tetap memerlukan WiFi yang sama dengan ESP32.</small>
         </div>
 
-        <h5 class="section-title">MONITORING REALTIME (LIVE)</h5>
+        <h5 class="section-title">MONITORING REALTIME (VIA CLOUD)</h5>
         <div class="row g-3">
             <div class="col-md-3"><div class="card-custom bg-danger"><h6>SUHU</h6><div class="data-value"><span id="v-suhu">--</span>°C</div></div></div>
             <div class="col-md-3"><div class="card-custom bg-primary"><h6>KELEMBAPAN</h6><div class="data-value"><span id="v-hum">--</span>%</div></div></div>
@@ -45,39 +46,25 @@
             <div class="col-md-3"><div class="card-custom bg-dark"><h6>COOLING FAN</h6><div class="data-value" id="v-fan">--</div></div></div>
         </div>
 
-        <h5 class="section-title">GRAFIK PENGUKURAN (TIAP 10 MENIT)</h5>
+        <h5 class="section-title">GRAFIK PENGUKURAN</h5>
         <div class="panel">
             <canvas id="liveChart" style="width: 100%; height: 350px;"></canvas>
         </div>
 
         <div class="row mt-4">
-            <div class="col-md-6">
-                <h5 class="section-title">MANAJEMEN SD CARD</h5>
-                <div class="panel d-flex gap-2">
-                    <button class="btn btn-outline-info fw-bold w-100" onclick="sendCmd('/status')">ℹ️ STATUS</button>
-                    <button class="btn btn-outline-primary fw-bold w-100" onclick="downloadSD()">💾 DOWNLOAD</button>
-                    <button class="btn btn-outline-danger fw-bold w-100" onclick="confirmReset()">🗑️ RESET</button>
+            <div class="col-md-12">
+                <h5 class="section-title">HISTORI DATA TERAKHIR</h5>
+                <div class="panel mb-5 table-responsive">
+                    <table class="table table-hover text-center">
+                        <thead class="table-dark">
+                            <tr><th>Timestamp</th><th>Suhu (°C)</th><th>Kelembapan (%)</th><th>Heater</th><th>Fan</th></tr>
+                        </thead>
+                        <tbody id="t-body">
+                            <tr><td colspan="5">Memuat data dari cloud...</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
-            <div class="col-md-6">
-                <h5 class="section-title">FILTER DATA HISTORI</h5>
-                <div class="panel d-flex gap-2">
-                    <input type="date" id="filter-date" class="form-control">
-                    <button class="btn btn-dark fw-bold px-4" onclick="filterHistory()">CARI</button>
-                </div>
-            </div>
-        </div>
-
-        <h5 class="section-title">HISTORI DATA (GOOGLE SHEETS)</h5>
-        <div class="panel mb-5 table-responsive">
-            <table class="table table-hover text-center">
-                <thead class="table-dark">
-                    <tr><th>Timestamp</th><th>Suhu (°C)</th><th>Kelembapan (%)</th><th>Heater</th><th>Fan</th></tr>
-                </thead>
-                <tbody id="t-body">
-                    <tr><td colspan="5">Memuat histori data...</td></tr>
-                </tbody>
-            </table>
         </div>
     </div>
 
@@ -85,31 +72,21 @@
         const GAS_URL = "https://script.google.com/macros/s/AKfycbyxtu0ce0M3Hu0Az11P-SGnNRKd8PfJyQ1NoScQlp7Oz1OG0kNgwbiH6gR6q_yzKF7KrQ/exec"; 
         let liveChart;
 
-        // FUNGSI KONTROL ESP32
         function sendCmd(path) {
             const ip = document.getElementById('esp-ip').value;
-            if(!ip || ip.includes("Mencari")) return alert("IP belum siap!");
-            fetch(`http://${ip}${path}`, { method: 'POST' })
-                .then(r => r.text())
-                .then(t => alert("Respons: " + t))
-                .catch(e => alert("Gagal koneksi. Pastikan ESP32 & Laptop di WiFi yang sama!"));
+            if(!ip || ip.includes("Mencari")) return alert("IP tidak terdeteksi!");
+            fetch(`http://${ip}${path}`, { method: 'POST', mode: 'no-cors' })
+                .then(() => alert("Perintah dikirim! (Cek alat)"))
+                .catch(e => alert("Gagal koneksi lokal. Pastikan satu WiFi untuk kontrol manual!"));
         }
-
-        function downloadSD() {
-            const ip = document.getElementById('esp-ip').value;
-            if(ip) window.open(`http://${ip}/download`, '_blank');
-        }
-
-        function confirmReset() { if(confirm("Hapus data di SD Card?")) sendCmd('/hapusdata'); }
 
         function toggleLogging() {
             const btn = document.getElementById('btn-logging');
             let newState = btn.innerText.includes("START") ? "ON" : "OFF";
             btn.innerText = "Memproses...";
-            fetch(`${GAS_URL}?action=toggle&value=${newState}`).then(() => fetchHistoryAndGraph());
+            fetch(`${GAS_URL}?action=toggle&value=${newState}`).then(() => fetchCloudData());
         }
 
-        // INIT GRAFIK
         function initChart() {
             const ctx = document.getElementById('liveChart').getContext('2d');
             liveChart = new Chart(ctx, {
@@ -125,32 +102,15 @@
             });
         }
 
-        // AMBIL DATA LIVE DARI ESP32 (YANG MENGISI KOTAK WARNA-WARNI)
-        function fetchRealtime() {
-            const ip = document.getElementById('esp-ip').value;
-            // Hanya jalan kalau IP sudah berbentuk angka dari G-Sheets
-            if(!ip || ip.includes("Mencari")) return;
-            
-            fetch(`http://${ip}/data`)
-                .then(r => r.json())
-                .then(d => {
-                    document.getElementById('v-suhu').innerText = d.suhu;
-                    document.getElementById('v-hum').innerText = d.kelembapan;
-                    document.getElementById('v-heater').innerText = d.heater;
-                    document.getElementById('v-fan').innerText = d.fan;
-                })
-                .catch(e => console.log("Menunggu koneksi langsung ke ESP32..."));
-        }
-
-        // AMBIL DATA HISTORI & IP DARI GOOGLE SHEETS
-        function fetchHistoryAndGraph() {
+        // FUNGSI UTAMA: AMBIL SEMUA DATA DARI CLOUD (G-SHEETS)
+        function fetchCloudData() {
             fetch(`${GAS_URL}?read=true`)
                 .then(r => r.json())
                 .then(res => {
-                    // Update IP
+                    // 1. Update IP
                     if(res.ip) document.getElementById('esp-ip').value = res.ip;
 
-                    // Update Tombol Status
+                    // 2. Update Status Logging
                     const btn = document.getElementById('btn-logging');
                     if(res.logging === "ON") {
                         btn.innerText = "⏹️ STOP LOGGING"; btn.className = "btn btn-danger fw-bold";
@@ -158,10 +118,18 @@
                         btn.innerText = "▶️ START LOGGING"; btn.className = "btn btn-success fw-bold";
                     }
 
-                    // Pastikan data histori ada sebelum update tabel
                     if(res.logs && res.logs.length > 0) {
+                        const lastData = res.logs[res.logs.length - 1];
+                        
+                        // 3. Update Kotak Realtime dari Data Terakhir Cloud
+                        document.getElementById('v-suhu').innerText = lastData.suhu;
+                        document.getElementById('v-hum').innerText = lastData.kelembapan;
+                        document.getElementById('v-heater').innerText = lastData.heater;
+                        document.getElementById('v-fan').innerText = lastData.fan;
+
+                        // 4. Update Tabel
                         let html = "";
-                        const dataReversed = [...res.logs].reverse().slice(0, 10);
+                        const dataReversed = [...res.logs].reverse().slice(0, 5);
                         dataReversed.forEach(row => {
                             html += `<tr><td>${row.waktu}</td><td>${row.suhu}</td><td>${row.kelembapan}</td>
                                      <td><span class="badge ${row.heater=='ON'?'bg-warning text-dark':'bg-secondary'}">${row.heater}</span></td>
@@ -169,29 +137,21 @@
                         });
                         document.getElementById('t-body').innerHTML = html;
 
-                        // Update Grafik
-                        const chartData = res.logs.slice(-20);
+                        // 5. Update Grafik
+                        const chartData = res.logs.slice(-15);
                         liveChart.data.labels = chartData.map(d => d.waktu.split(' ')[1] || d.waktu);
                         liveChart.data.datasets[0].data = chartData.map(d => d.suhu);
                         liveChart.data.datasets[1].data = chartData.map(d => d.kelembapan);
                         liveChart.update();
                     }
                 })
-                .catch(e => console.error("Proses sinkronisasi Google Sheets tertunda..."));
+                .catch(e => console.error("Sinkronisasi Cloud Tertunda..."));
         }
 
-        // FUNGSI FILTER TANGGAL (Kosongan agar tombol tidak error, logika bisa dikembangkan nanti)
-        function filterHistory() {
-            alert("Fitur filter tanggal memuat ulang data G-Sheets...");
-            fetchHistoryAndGraph(); 
-        }
-
-        // JALANKAN SAAT HALAMAN DIBUKA
         window.onload = () => {
             initChart();
-            fetchHistoryAndGraph(); // Ambil IP dan Histori dari G-Sheets
-            setInterval(fetchRealtime, 2000); // Ambil Suhu Live tiap 2 detik
-            setInterval(fetchHistoryAndGraph, 15000); // Sinkron G-Sheets tiap 15 detik
+            fetchCloudData(); 
+            setInterval(fetchCloudData, 10000); // Update tiap 10 detik dari cloud
         };
     </script>
 </body>
